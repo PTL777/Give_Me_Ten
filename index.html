@@ -165,12 +165,6 @@
   .tile .num.rotated{ transform: rotate(90deg); }
   .tile .num.blink-hidden{ opacity: 0; }
 
-  .tile .num.cleared-num{
-    color: #FFFFFF;
-    -webkit-text-stroke: 2px #000000;
-    text-shadow: none;
-  }
-
   .tile:active{ transform: scale(0.94); }
 
   .tile.c0{ background: radial-gradient(circle at 32% 28%, #F16460 0%, #E0201C 55%, #8C0F0C 100%); }
@@ -887,7 +881,7 @@
   let timeLeft = 15;
 
   function getTimeLimit(lv){
-    return 30;
+    return 18;
   }
 
   const STORAGE_KEY = 'give-me-10-level-v2';
@@ -1257,8 +1251,8 @@
             s.el.classList.add('cleared');
             if (numSpans[s.idx]){
               numSpans[s.idx].textContent = s.origVal;
-              numSpans[s.idx].classList.add('cleared-num');
-              numSpans[s.idx].style.transform = '';
+              const clearedDeg = (s.origVal === 8 || s.origVal === 6 || s.origVal === 9) ? 90 : 180;
+              numSpans[s.idx].style.transform = 'rotate(' + clearedDeg + 'deg)';
             }
           });
           selected = [];
