@@ -966,7 +966,7 @@
   }
 
   function clearBlinkTimers(){
-    blinkTimers.forEach(id => clearTimeout(id));
+    blinkTimers.forEach(id => { clearTimeout(id); clearInterval(id); });
     blinkTimers = [];
   }
 
@@ -1039,6 +1039,7 @@
   function renderBoard(cfg){
     boardEl.innerHTML = '';
     numSpans = [];
+    const blinkCandidates = [];
 
     values.forEach((val, idx) => {
       const tile = document.createElement('div');
@@ -1075,15 +1076,16 @@
       ballFace.appendChild(ballNumber);
       tile.appendChild(ballFace);
 
-      tile.addEventListener('click', () => onTileClick(idx, tile));
+      tile.addEventListener('pointerdown', (e) => { e.preventDefault(); onTileClick(idx, tile); });
       boardEl.appendChild(tile);
 
       numSpans[idx] = numSpan;
-
-      if (cfg.blink && !isNil){
-        scheduleBlink(numSpan);
-      }
+      if (!isNil) blinkCandidates.push(numSpan);
     });
+
+    if (cfg.blink){
+      setupAlternatingBlink(blinkCandidates);
+    }
 
     if (cfg.move){
       moveInterval = setInterval(() => {
@@ -1102,20 +1104,24 @@
     });
   }
 
-  function scheduleBlink(numSpan){
-    function cycle(){
-      const delay = 1400 + Math.random() * 1200; // ~2s, randomized
-      const id = setTimeout(() => {
-        numSpan.classList.add('blink-hidden');
-        const id2 = setTimeout(() => {
-          numSpan.classList.remove('blink-hidden');
-          cycle();
-        }, 2000);
-        blinkTimers.push(id2);
-      }, delay);
-      blinkTimers.push(id);
+  function setupAlternatingBlink(numSpans){
+    const shuffled = shuffledIndices(numSpans.length).map(i => numSpans[i]);
+    const half = Math.ceil(shuffled.length / 2);
+    const groupA = shuffled.slice(0, half);
+    const groupB = shuffled.slice(half);
+
+    let phase = 0; // 0 = groupA hidden, groupB visible; 1 = the reverse
+    function applyPhase(){
+      groupA.forEach(el => el.classList.toggle('blink-hidden', phase === 0));
+      groupB.forEach(el => el.classList.toggle('blink-hidden', phase === 1));
     }
-    cycle();
+
+    applyPhase();
+    const id = setInterval(() => {
+      phase = phase === 0 ? 1 : 0;
+      applyPhase();
+    }, 2000);
+    blinkTimers.push(id);
   }
 
   function renderPickSlots(){
