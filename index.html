@@ -882,7 +882,7 @@
   let timeLeft = 15;
 
   function getTimeLimit(lv){
-    return 18;
+    return 20;
   }
 
   const STORAGE_KEY = 'give-me-10-level-v2';
@@ -1273,7 +1273,7 @@
           } else {
             hintTextEl.textContent = (remaining / 2) + ' pair' + (remaining === 2 ? '' : 's') + ' left!';
           }
-        }, 420);
+        }, 280);
       } else {
         selected.forEach(s => s.el.classList.add('wrong'));
         hintTextEl.textContent = 'That adds up to ' + sum + ', not ' + target + '. Try again!';
@@ -1284,7 +1284,7 @@
           selected = [];
           locked = false;
           renderPickSlots();
-        }, 500);
+        }, 320);
       }
     }
   }
