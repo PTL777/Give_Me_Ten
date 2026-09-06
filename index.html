@@ -100,6 +100,7 @@
     color: var(--ink);
     user-select:none;
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
     box-shadow: 0 10px 16px rgba(0,0,0,0.35), inset -10px -12px 22px rgba(0,0,0,0.38), inset 6px 8px 12px rgba(255,255,255,0.3);
     transition: transform .12s ease, border-color .12s ease, opacity .3s ease, box-shadow .12s ease;
     overflow:hidden;
@@ -881,7 +882,7 @@
   let timeLeft = 15;
 
   function getTimeLimit(lv){
-    return 27;
+    return 20;
   }
 
   const STORAGE_KEY = 'give-me-10-level-v2';
@@ -941,7 +942,7 @@
       tileCount: FIXED_MULTISET.length,
       nilCount: 0,
       rotation: 'none',
-      blink: false,
+      blink: true,
       move: false
     };
   }
