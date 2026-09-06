@@ -882,7 +882,7 @@
   let timeLeft = 15;
 
   function getTimeLimit(lv){
-    return 20;
+    return 18;
   }
 
   const STORAGE_KEY = 'give-me-10-level-v2';
@@ -1110,7 +1110,7 @@
         const id2 = setTimeout(() => {
           numSpan.classList.remove('blink-hidden');
           cycle();
-        }, 450 + Math.random() * 250);
+        }, 2000);
         blinkTimers.push(id2);
       }, delay);
       blinkTimers.push(id);
