@@ -1139,7 +1139,7 @@
 
       const ballFace = document.createElement('div');
       ballFace.className = 'ball-face';
-      const angleModeLevel = (level >= 1 && level <= 4);
+      const angleModeLevel = (level >= 1 && level <= MAX_LEVEL);
       if (angleModeLevel || (!isNil && (val === 7 || val === 6 || val === 9))){
         // keep upright — angle-mode levels need a clean, precise rotation with no
         // extra cosmetic tilt, and 6/7/9 always stay upright to avoid misreads
@@ -1158,7 +1158,7 @@
       numSpan.className = 'num';
       numSpan.textContent = isNil ? '?' : val;
       if (!isNil){
-        const deg = (level >= 1 && level <= 4) ? angles[idx] : rotationDegreeFor(cfg.rotation, val);
+        const deg = (level >= 1 && level <= MAX_LEVEL) ? angles[idx] : rotationDegreeFor(cfg.rotation, val);
         if (deg !== 0) numSpan.style.transform = 'rotate(' + deg + 'deg)';
       }
 
@@ -1374,7 +1374,7 @@
       const v0 = values[selected[0].idx];
       const v1 = values[selected[1].idx];
       const sum = v0 + v1;
-      const isBomb = (level >= 1 && level <= 4) && sum === target &&
+      const isBomb = (level >= 1 && level <= MAX_LEVEL) && sum === target &&
         angles[selected[0].idx] !== angles[selected[1].idx];
 
       if (isBomb){
