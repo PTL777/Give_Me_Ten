@@ -297,6 +297,21 @@
     box-shadow: 0 2px 5px rgba(0,0,0,0.35);
   }
 
+  .level-chip span.level-total{
+    display:inline;
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    margin-left: 2px;
+    border-radius: 0;
+    background: none;
+    color: #FFFFFF;
+    font-size: 20px;
+    font-weight: 700;
+    box-shadow: none;
+    opacity: 0.85;
+  }
+
 
 
   .target-chip{
@@ -787,9 +802,8 @@
     </div>
   </div>
   <div class="controls-row">
-    <div class="level-chip">Level <span id="levelNum">1</span></div>
+    <div class="level-chip">Level <span id="levelNum">1</span><span class="level-total">/30</span></div>
     <div class="timer-badge" id="timerBadge">⏱ 15s</div>
-    <button class="hint-btn" id="hintBtn">💡 Hint</button>
   </div>
 </div>
 
@@ -802,9 +816,9 @@
 </div>
 
 <div class="overlay lose-overlay" id="loseOverlay">
-  <div class="lose-icon">⏰</div>
+  <div class="lose-icon" id="loseIcon">⏰</div>
   <div class="big lose-big">LOST!</div>
-  <div class="lose-sub">Time ran out — try again!</div>
+  <div class="lose-sub" id="loseSub">Time ran out — try again!</div>
   <button id="loseReplayBtn">🔄 Tap to Replay</button>
 </div>
 
@@ -881,8 +895,16 @@
   let countdownInterval = null;
   let timeLeft = 15;
 
+  // Time limit per level, index 0 = level 1. null means no time limit.
+  const TIME_TABLE = [
+    null, 55, 40, 30, 20, 15, 10,           // levels 1-7   (angle only)
+    55, 45, 35, 25, 20, 19, 17, 15,         // levels 8-15  (angle + blink)
+    55, 45, 35, 25, 20, 19, 17, 15,         // levels 16-23 (angle + move)
+    50, 45, 35, 25, 20, 17, 15              // levels 24-30 (angle + move)
+  ];
+
   function getTimeLimit(lv){
-    return 20;
+    return TIME_TABLE[lv - 1];
   }
 
   const STORAGE_KEY = 'give-me-10-level-v2';
@@ -910,8 +932,7 @@
   const levelNumEl = document.getElementById('levelNum');
   const targetValueEl = document.getElementById('targetValue');
   const hintTextEl = document.getElementById('hintText');
-  const hintBtn = document.getElementById('hintBtn');
-  const overlayEl = document.getElementById('overlay');
+    const overlayEl = document.getElementById('overlay');
   const overlayBigEl = document.getElementById('overlayBig');
   const overlaySubEl = document.getElementById('overlaySub');
 
@@ -928,22 +949,47 @@
     return arr;
   }
 
-  const MAX_LEVEL = 35;
+  const MAX_LEVEL = 30;
 
   // Fixed multiset that always makes exactly 10 pairs summing to 10:
   // two 1s, two 9s, three 2s, three 8s, two 3s, two 7s, two 4s, two 6s, two 5s
   const FIXED_MULTISET = [1,1,9,9, 2,2,2,8,8,8, 3,3,7,7, 4,4,6,6, 5,5];
 
+  // Angle-matching mechanic (levels 1-4): each pair gets a rotation angle from
+  // just 3 options — clockwise 13°, normal, or anti-clockwise 13°. Duplicate
+  // digit groups (e.g. the three 2-8 pairs) are assigned distinct angles within
+  // their own group, so only the true partner shares your ball's exact angle.
+  const FIXED_PAIRS = [[1,9],[2,8],[3,7],[4,6],[5,5],[6,4],[7,3],[2,8],[1,9],[2,8]];
+  const ANGLE_OPTIONS = [23, -23]; // 23° clockwise, 23° anti-clockwise
+
+  function buildPairAngles(){
+    const typeCounters = {};
+    return FIXED_PAIRS.map(pair => {
+      const key = [...pair].sort((a, b) => a - b).join('-');
+      const usedIdx = typeCounters[key] || 0;
+      typeCounters[key] = usedIdx + 1;
+      return ANGLE_OPTIONS[usedIdx % ANGLE_OPTIONS.length];
+    });
+  }
+
+  let angles = []; // angles[idx] -> rotation angle assigned to the tile at that position (angle-mode levels only)
+  let clearedOrig = []; // clearedOrig[idx] -> original value of a matched/cleared ball at that position, else null
+
   function levelConfig(lv){
+    // All 30 levels use the angle-matching mechanic.
+    // Levels 1-7:   angle only
+    // Levels 8-15:  angle + blink
+    // Levels 16-30: angle + moving positions
+    const blink = (lv >= 8 && lv <= 15);
+    const move = (lv >= 16 && lv <= 30);
     return {
-      target: 10,
-      min: 1,
-      max: 9,
+      target: 10, min: 1, max: 9,
       tileCount: FIXED_MULTISET.length,
-      nilCount: 0,
-      rotation: 'none',
-      blink: true,
-      move: false
+      nilCount: 0, rotation: 'none',
+      blink: blink,
+      move: move,
+      moveMs: 1000,
+      angleMode: true
     };
   }
 
@@ -965,6 +1011,22 @@
     return order.map(i => FIXED_MULTISET[i]);
   }
 
+  function generateAngleBoard(){
+    const pairAngles = buildPairAngles();
+    const tiles = [];
+    FIXED_PAIRS.forEach((pair, i) => {
+      const angle = pairAngles[i];
+      tiles.push({ value: pair[0], angle: angle });
+      tiles.push({ value: pair[1], angle: angle });
+    });
+    const order = shuffledIndices(tiles.length);
+    const shuffled = order.map(i => tiles[i]);
+    return {
+      values: shuffled.map(t => t.value),
+      angles: shuffled.map(t => t.angle)
+    };
+  }
+
   function clearBlinkTimers(){
     blinkTimers.forEach(id => { clearTimeout(id); clearInterval(id); });
     blinkTimers = [];
@@ -972,7 +1034,17 @@
 
   function updateTimerDisplay(){
     const timerBadge = document.getElementById('timerBadge');
-    timerBadge.textContent = '⏱ ' + timeLeft + 's';
+    if (timeLeft === null){
+      timerBadge.textContent = '⏱ ∞';
+      timerBadge.classList.remove('urgent');
+      return;
+    }
+    const mins = Math.floor(timeLeft / 60);
+    const secs = timeLeft % 60;
+    const display = mins > 0
+      ? mins + ':' + String(secs).padStart(2, '0')
+      : timeLeft + 's';
+    timerBadge.textContent = '⏱ ' + display;
     timerBadge.classList.toggle('urgent', timeLeft <= 5);
   }
 
@@ -980,6 +1052,7 @@
     clearInterval(countdownInterval);
     timeLeft = getTimeLimit(level);
     updateTimerDisplay();
+    if (timeLeft === null) return; // no time limit on this level
     countdownInterval = setInterval(() => {
       timeLeft--;
       updateTimerDisplay();
@@ -990,9 +1063,16 @@
     }, 1000);
   }
 
-  function handleTimeUp(){
+  function showLose(icon, message){
+    clearInterval(countdownInterval);
     boardEl.querySelectorAll('.tile').forEach(t => t.style.pointerEvents = 'none');
+    document.getElementById('loseIcon').textContent = icon;
+    document.getElementById('loseSub').textContent = message;
     document.getElementById('loseOverlay').classList.add('show');
+  }
+
+  function handleTimeUp(){
+    showLose('⏰', "Time ran out — try again!");
   }
 
   document.getElementById('loseReplayBtn').addEventListener('click', () => {
@@ -1006,7 +1086,15 @@
     target = cfg.target;
     min = cfg.min;
     max = cfg.max;
-    values = generateBoard(target, min, max, cfg.tileCount, cfg.nilCount);
+    if (cfg.angleMode){
+      const board = generateAngleBoard();
+      values = board.values;
+      angles = board.angles;
+    } else {
+      values = generateBoard(target, min, max, cfg.tileCount, cfg.nilCount);
+      angles = new Array(values.length).fill(0);
+    }
+    clearedOrig = new Array(values.length).fill(null);
     selected = [];
     locked = false;
     clearTimeout(hintTimeout);
@@ -1018,9 +1106,9 @@
     startCountdown();
 
     levelNumEl.textContent = level;
+    document.querySelector('.level-total').textContent = '/' + MAX_LEVEL;
     targetValueEl.textContent = target;
     hintTextEl.textContent = '\u00A0';
-    hintBtn.disabled = false;
     overlayEl.classList.remove('show');
     document.getElementById('loseOverlay').classList.remove('show');
     renderPickSlots();
@@ -1051,8 +1139,10 @@
 
       const ballFace = document.createElement('div');
       ballFace.className = 'ball-face';
-      if (!isNil && (val === 7 || val === 6 || val === 9)){
-        // keep these upright — tilting risks 7 looking like 1, and 6/9 becoming an unreadable swirl
+      const angleModeLevel = (level >= 1 && level <= 4);
+      if (angleModeLevel || (!isNil && (val === 7 || val === 6 || val === 9))){
+        // keep upright — angle-mode levels need a clean, precise rotation with no
+        // extra cosmetic tilt, and 6/7/9 always stay upright to avoid misreads
       } else {
         const tiltX = randInt(-20, 20);
         const tiltY = randInt(-20, 20);
@@ -1068,7 +1158,7 @@
       numSpan.className = 'num';
       numSpan.textContent = isNil ? '?' : val;
       if (!isNil){
-        const deg = rotationDegreeFor(cfg.rotation, val);
+        const deg = (level >= 1 && level <= 4) ? angles[idx] : rotationDegreeFor(cfg.rotation, val);
         if (deg !== 0) numSpan.style.transform = 'rotate(' + deg + 'deg)';
       }
 
@@ -1089,18 +1179,57 @@
 
     if (cfg.move){
       moveInterval = setInterval(() => {
-        if (locked) return; // don't reshuffle mid-check
+        if (locked) return; // don't reshuffle while checking a pair
         shuffleValuesInPlace();
       }, cfg.moveMs);
     }
   }
 
   function shuffleValuesInPlace(){
-    const order = shuffledIndices(values.length);
-    const newValues = order.map(i => values[i]);
-    values = newValues;
-    values.forEach((val, idx) => {
-      if (numSpans[idx]) numSpans[idx].textContent = val;
+    // Reshuffle every position (active AND already-cleared balls), except any
+    // ball the player is currently holding mid-selection.
+    const heldIndices = new Set(selected.map(s => s.idx));
+    const allIndices = [];
+    for (let i = 0; i < values.length; i++){
+      if (!heldIndices.has(i)) allIndices.push(i);
+    }
+    if (allIndices.length < 2) return;
+
+    const bundles = allIndices.map(i => ({
+      cleared: clearedOrig[i] !== null,
+      value: values[i],
+      angle: angles[i],
+      origVal: clearedOrig[i]
+    }));
+
+    for (let i = bundles.length - 1; i > 0; i--){
+      const j = randInt(0, i);
+      [bundles[i], bundles[j]] = [bundles[j], bundles[i]];
+    }
+
+    allIndices.forEach((idx, k) => {
+      const b = bundles[k];
+      const tileEl = boardEl.querySelector('.tile[data-idx="' + idx + '"]');
+
+      if (b.cleared){
+        values[idx] = null;
+        clearedOrig[idx] = b.origVal;
+        angles[idx] = b.angle;
+        if (tileEl) tileEl.classList.add('cleared');
+        if (numSpans[idx]){
+          numSpans[idx].textContent = b.origVal;
+          numSpans[idx].style.transform = 'rotate(180deg)';
+        }
+      } else {
+        values[idx] = b.value;
+        clearedOrig[idx] = null;
+        angles[idx] = b.angle;
+        if (tileEl) tileEl.classList.remove('cleared');
+        if (numSpans[idx]){
+          numSpans[idx].textContent = b.value;
+          numSpans[idx].style.transform = b.angle !== 0 ? 'rotate(' + b.angle + 'deg)' : '';
+        }
+      }
     });
   }
 
@@ -1245,11 +1374,27 @@
       const v0 = values[selected[0].idx];
       const v1 = values[selected[1].idx];
       const sum = v0 + v1;
+      const isBomb = (level >= 1 && level <= 4) && sum === target &&
+        angles[selected[0].idx] !== angles[selected[1].idx];
+
+      if (isBomb){
+        selected.forEach(s => s.el.classList.add('wrong'));
+        hintTextEl.textContent = 'Right numbers, wrong angle — try again!';
+        setTimeout(() => {
+          selected.forEach(s => {
+            s.el.classList.remove('selected', 'wrong');
+          });
+          selected = [];
+          locked = false;
+          renderPickSlots();
+        }, 320);
+        return;
+      }
 
       if (sum === target){
         selected.forEach(s => s.el.classList.add('correct'));
         const clearedThisRound = selected.slice();
-        clearedThisRound.forEach(s => { s.origVal = values[s.idx]; values[s.idx] = null; });
+        clearedThisRound.forEach(s => { s.origVal = values[s.idx]; values[s.idx] = null; clearedOrig[s.idx] = s.origVal; });
         hintTextEl.textContent = '\u00A0';
 
         setTimeout(() => {
@@ -1258,8 +1403,7 @@
             s.el.classList.add('cleared');
             if (numSpans[s.idx]){
               numSpans[s.idx].textContent = s.origVal;
-              const clearedDeg = (s.origVal === 8 || s.origVal === 6 || s.origVal === 9) ? 90 : 180;
-              numSpans[s.idx].style.transform = 'rotate(' + clearedDeg + 'deg)';
+              numSpans[s.idx].style.transform = 'rotate(180deg)';
             }
           });
           selected = [];
@@ -1640,7 +1784,6 @@
     startLevel(1);
   });
 
-  hintBtn.addEventListener('click', onHintClick);
 
   const params = new URLSearchParams(location.search);
   if (params.get('finale') === '1'){
