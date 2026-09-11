@@ -897,10 +897,10 @@
 
   // Time limit per level, index 0 = level 1. null means no time limit.
   const TIME_TABLE = [
-    null, 55, 40, 30, 20, 19, 18,            // levels 1-7   (angle only)
-    55, 40, 35, 25, 23, 22, 21, 19,          // levels 8-15  (angle + blink)
-    55, 38, 35, 30, 27, 24, 21, 19,          // levels 16-23 (angle + move)
-    50, 45, 35, 30, 28, 25, 20               // levels 24-30 (angle + move)
+    null, 55, 40, 30, 20, 15, 10,           // levels 1-7   (angle only)
+    55, 45, 35, 25, 20, 19, 17, 15,         // levels 8-15  (angle + blink)
+    55, 45, 35, 25, 20, 19, 17, 15,         // levels 16-23 (angle + move)
+    50, 45, 35, 25, 20, 17, 15              // levels 24-30 (angle + move)
   ];
 
   function getTimeLimit(lv){
